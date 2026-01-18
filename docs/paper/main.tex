@@ -1,0 +1,96 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{authblk}
+\usepackage{url}
+
+\title{FractalVideoGuard v0.5.2:\\Production-Oriented Deepfake Video Indicators via Fractal--Informational Ontology and Long-Range Dependence (DFA)}
+\author[1]{Igor Chechelnitsky}
+\affil[1]{Independent Researcher, Ashkelon, Israel\\ORCID: 0009-0007-4607-1946}
+\date{January 18, 2026\\Version: 0.5.2}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present \textit{FractalVideoGuard v0.5.2}, a production-oriented, interpretable pipeline for video authenticity indicators based on (i) long-range temporal dependence measured by detrended fluctuation analysis (DFA) and (ii) fractal complexity of edge structures measured via box-counting dimension. The implementation is designed for operational robustness: hard timeouts against backend hangs, cross-platform safe rotation metadata detection, memory-stable ROI standardization, and numerically stable frequency artifact proxies. The system supports files, webcams, and RTSP/HTTP streams under OpenCV/FFmpeg. This paper describes the theoretical motivation, implementation details, and reproducibility protocol.
+\end{abstract}
+
+\section{Introduction}
+Deepfake detection often relies on high-capacity neural classifiers; however, production constraints require robustness, interpretability, and controllable resource use. FractalVideoGuard focuses on low-level video-derived indicators inspired by the QO3/FIO ``universal attractor'' viewpoint: real-world videos tend to preserve multi-scale edge complexity and exhibit persistent temporal correlations, whereas synthetic pipelines may weaken long-range structure and smooth multi-scale geometry.
+
+\section{Theory and Indicators}
+\subsection{Long-Range Dependence via DFA}
+Let $x_t$ be a per-frame scalar time series extracted from the video (in this work: edge density on standardized ROI). DFA estimates the scaling exponent $H$ from the relationship:
+\[
+F(s) \propto s^H,
+\]
+where $F(s)$ is the RMS fluctuation after detrending over scale $s$. We compute $H$ via linear regression in log-log space and report $R^2$ as a quality criterion.
+
+\subsection{Fractal Dimension via Box Counting}
+Given a binary edge map $E$ on ROI, we estimate fractal dimension $D$ by box counting:
+\[
+N(\epsilon) \propto \epsilon^{-D},
+\]
+where $N(\epsilon)$ is the number of boxes of side $\epsilon$ intersecting edges. Again we compute $D$ from linear regression in log-log space and use $R^2$ gating.
+
+\section{Pipeline}
+\subsection{Inputs}
+Sources include: (a) file paths, (b) webcam indices, (c) RTSP/HTTP URLs. For stream safety, OpenCV/FFmpeg capture options can be applied via environment variable \texttt{OPENCV\_FFMPEG\_CAPTURE\_OPTIONS}.
+
+\subsection{ROI Extraction}
+ROI is obtained by: MediaPipe face detection (optional), Haar cascade fallback, or center crop fallback. Temporal stability is achieved by EMA smoothing of the bounding box. Quality filters include brightness range and blur rejection via Laplacian variance.
+
+\subsection{Standardization}
+ROI is resized to a fixed square size (power-of-two recommended) for consistent FFT/DCT characteristics and predictable compute. A buffer-reuse standardizer prevents memory growth in batch processing.
+
+\subsection{Feature Families}
+We compute:
+\begin{itemize}
+\item \textbf{Fractal/LRD}: edge density time series $\Rightarrow H$ (DFA), per-frame box-counting dimension $\Rightarrow D$.
+\item \textbf{Frequency artifacts}: DCT high-frequency energy fraction, FFT outer-band energy fraction, block boundary discontinuity (blockiness), robust ringing proxy, block mean variance.
+\end{itemize}
+
+\section{Production Safety and Hardening}
+\subsection{Anti-hang strategy}
+Two independent protections are used:
+\begin{enumerate}
+\item \textbf{Rotation metadata in a subprocess with timeout}: prevents DoS via backend hangs on \texttt{cap.get(...)}.
+\item \textbf{Hard timeout for the entire analysis in a subprocess}: if the backend hangs during decoding or I/O, the worker process is terminated.
+\end{enumerate}
+
+\subsection{Numerical stability}
+Ringing proxy uses MAD normalization with a strict floor (relative epsilon) to prevent division by near-zero, and clamps extreme/invalid values to NaN to avoid contaminating aggregates.
+
+\section{Reproducibility Protocol}
+We recommend storing:
+\begin{itemize}
+\item the exact \texttt{config.json} used,
+\item the output JSON report,
+\item SHA-256 hashes of inputs (optional but recommended),
+\item package version tag and dependencies.
+\end{itemize}
+
+\section{Limitations}
+Indicators depend on ROI quality and sufficient temporal length for DFA. Extreme re-encoding/transcoding or adversarial post-processing may affect frequency indicators. Cross-generator generalization should be validated across model families and codecs.
+
+\section{Conclusion}
+FractalVideoGuard v0.5.2 provides a pragmatic, production-oriented approach to interpretable video authenticity indicators with explicit operational safety: hard timeouts, memory stability, and cross-platform stream support.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+\section{Command-line Usage}
+\begin{verbatim}
+python fractalvideoguard_v0_5_2.py --preset fast --extract video.mp4 --hard-timeout-sec 120
+python fractalvideoguard_v0_5_2.py --preset mobile --extract 0 --hard-timeout-sec 60
+python fractalvideoguard_v0_5_2.py --preset fast --extract rtsp://... --hard-timeout-sec 120
+\end{verbatim}
+
+\end{document}
