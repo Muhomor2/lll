@@ -56,7 +56,7 @@ These deviations from natural attractors serve as robust deepfake indicators. Se
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/fractalvideoguard.git
+git clone https://github.com/muhomor2/fractalvideoguard.git
 cd fractalvideoguard
 
 # Install dependencies
